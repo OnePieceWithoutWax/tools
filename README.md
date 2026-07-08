@@ -18,6 +18,17 @@ tools/
 - **`windows/`** holds PowerShell/batch scripts that aren't Python packages. Each subfolder gets a short README explaining what the scripts do and how to use them.
 - **`uv.lock` is committed**; `.venv/` is never committed.
 
+## Tools
+
+### git-sync
+
+Syncs all git repos under a folder: fetches, fast-forward pulls repos that are behind, pushes repos that are ahead, and skips anything dirty, diverged, or without an upstream.
+
+```
+uv tool install ./git-sync
+git-sync <folder> [--recursive] [--dry-run] [--jobs N]
+```
+
 ## Using a tool
 
 Install a tool globally:

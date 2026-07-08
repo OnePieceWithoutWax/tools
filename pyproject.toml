@@ -2,7 +2,7 @@
 # subdirectories and are registered as workspace members below.
 
 [tool.uv.workspace]
-members = []
+members = ["git-sync"]
 
 [dependency-groups]
 dev = [
