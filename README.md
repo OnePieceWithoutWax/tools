@@ -1,2 +1,41 @@
 # tools
-A collection of tools
+
+A [uv workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) holding multiple small Python CLI tools, plus a tracked `windows/` directory for PowerShell/batch scripts.
+
+## Layout
+
+```
+tools/
+├── pyproject.toml     # workspace root — NOT an installable package
+├── windows/           # non-Python scripts (PowerShell/batch), tracked as plain files
+└── <tool>/            # one directory per Python tool, registered as a workspace member
+```
+
+## Conventions
+
+- **Each Python tool is a workspace member**: its own directory, its own `pyproject.toml` with a console-script entry point, src layout (`<tool>/src/<pkg>/`), and its own `tests/`.
+- **Shared dev tooling lives at the root** — ruff and pytest configuration in the root `pyproject.toml` applies to every member. The root dev dependency group provides `ruff` and `pytest`.
+- **`windows/`** holds PowerShell/batch scripts that aren't Python packages. Each subfolder gets a short README explaining what the scripts do and how to use them.
+- **`uv.lock` is committed**; `.venv/` is never committed.
+
+## Using a tool
+
+Install a tool globally:
+
+```
+uv tool install ./<tool>
+```
+
+Run without installing:
+
+```
+uv run --package <tool> <command>
+```
+
+## Adding a new tool
+
+1. Create the tool directory: `<tool>/`
+2. Add it to `members` in the root `pyproject.toml` under `[tool.uv.workspace]`
+3. Use src layout: `<tool>/src/<pkg>/` with a `pyproject.toml` defining a console-script entry point (`[project.scripts]`)
+4. Add `<tool>/tests/`
+5. Add a section for the tool to this README

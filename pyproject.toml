@@ -1,0 +1,22 @@
+# Workspace root — not an installable package. Tool packages live in
+# subdirectories and are registered as workspace members below.
+
+[tool.uv.workspace]
+members = []
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pytest",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PTH"]
+
+[tool.pytest.ini_options]
+# Each workspace member keeps its own tests/ directory; the glob picks them all up.
+testpaths = ["*/tests"]

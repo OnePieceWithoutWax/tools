@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environments — never commit .venv
+.venv/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+
+# uv
+# uv.lock IS committed (reproducible installs across machines) — do not ignore it.
