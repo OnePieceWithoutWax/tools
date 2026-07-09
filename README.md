@@ -29,6 +29,19 @@ uv tool install ./git-sync
 git-sync <folder> [--recursive] [--dry-run] [--jobs N]
 ```
 
+### pdf-scrub
+
+Strips mailto link annotations and watermarks (annotation- and layer-based) from PDFs.
+
+```
+uv tool install ./pdf-scrub
+pdf-scrub <input.pdf> [output.pdf] [--no-mailto] [--no-watermarks]
+```
+
+### Windows scripts
+
+Non-Python PowerShell/batch scripts live in [windows/](windows/README.md): a remote-dev setup kit (SSH/Tailscale/WSL/mosh/tmux), "open shell here" launchers, and a Jupyter kernel diagnostic.
+
 ## Using a tool
 
 Install a tool globally:
