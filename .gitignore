@@ -14,3 +14,6 @@ build/
 
 # uv
 # uv.lock IS committed (reproducible installs across machines) — do not ignore it.
+
+# Personal scratch notes — not tracked
+IDEAS.md
