@@ -26,7 +26,7 @@ One rule: **the `-all` suffix means the operation repeats once per repository.**
 | Shape | Meaning | Commands |
 |---|---|---|
 | `<git-verb>-all` | A git operation applied to every repo found under a folder | `pull-all`, `push-all`, `fetch-all`, `status-all`, `clean-all`, `config-all` |
-| `sync-all` | The composite: pull where behind, push where ahead | `sync-all` |
+| `<intent>-all` | A composite that names what it is for rather than one git verb | `sync-all`, `reconcile-all` |
 | `hub <verb>` | GitHub-specific, and runs once rather than per repo | `hub list`, `hub audit` |
 | `hub <verb>-all` | GitHub-specific, and fans out | `hub clone-all` |
 
@@ -58,6 +58,7 @@ git-tools <command> [folder] [--recursive] [--jobs N]
 | Command | Network | Changes your repos | What it does |
 |---|---|---|---|
 | `sync-all` | yes | yes | Fetch, pull repos that are behind, push repos that are ahead. |
+| `reconcile-all` | yes | yes | `sync-all`, plus: rebase diverged repos onto upstream and push. Aborts on conflict. |
 | `pull-all` | yes | yes | Fetch and fast-forward pull repos that are behind. **Never pushes.** |
 | `push-all` | yes | yes | Fetch and push repos that are ahead. **Never pulls.** |
 | `fetch-all` | yes | no | Fetch, then report what is behind/ahead. Touches nothing locally. |
@@ -78,6 +79,7 @@ git-tools status-all ~/code           # what's the state of everything? (offline
 git-tools pull-all ~/code             # bring everything up to date, push nothing
 git-tools push-all ~/code --dry-run   # what am I sitting on that isn't pushed?
 git-tools sync-all ~/code -r          # full two-way sync, whole tree
+git-tools reconcile-all ~/code        # same, but untangle diverged repos too
 git-tools clean-all ~/code --dry-run  # which merged branches could go?
 git-tools config-all user.email ~/code --expect '*@gmail.com'
 ```
@@ -119,17 +121,20 @@ git-tools hub audit ~/code
 
 ## Result statuses
 
-`sync-all`, `pull-all`, `push-all`, `fetch-all`, and `status-all` give each repo one row:
+`sync-all`, `reconcile-all`, `pull-all`, `push-all`, `fetch-all`, and `status-all` give each repo
+one row:
 
 | Status | Meaning |
 |---|---|
 | `UP_TO_DATE` | Clean, and level with its upstream. |
 | `PULLED` | Clean and behind; fast-forwarded to upstream. |
 | `PUSHED` | Clean and ahead; pushed to upstream. |
+| `RECONCILED` | Was diverged; rebased onto upstream and pushed (`reconcile-all` only). |
 | `BEHIND` | Behind, and this command does not pull (so: `push-all`, `fetch-all`, `status-all`). |
 | `AHEAD` | Ahead, and this command does not push (so: `pull-all`, `fetch-all`, `status-all`). |
 | `DIRTY` | Uncommitted changes to *tracked* files; reported with its counts but never touched. Untracked files alone do not count — see below. |
-| `DIVERGED` | Both behind and ahead; skipped — needs a manual merge/rebase. |
+| `DIVERGED` | Both behind and ahead; skipped — try `reconcile-all`, or merge/rebase by hand. |
+| `CONFLICT` | `reconcile-all` tried to rebase and git could not auto-merge; the rebase was aborted and the repo left exactly as it was. The conflicting paths are in the detail column — resolve by hand. |
 | `NO_UPSTREAM` | Detached HEAD, or the current branch has no upstream configured; skipped. |
 | `COLLISION` | An untracked local file sits where a pulled file would land; git aborted the pull and the repo was left exactly as it was. The paths are listed in the detail column — move or delete them, then re-run. |
 | `PULL_FAILED` | A fast-forward pull was attempted but git refused for some other reason. |
@@ -147,12 +152,37 @@ For each repo found under `folder`:
 3. Resolve the upstream branch — no upstream means `NO_UPSTREAM` and stops there.
 4. Fetch, to bring the local view of the upstream up to date (skipped by `status-all`).
 5. Count commits behind/ahead of upstream.
-6. Act: both non-zero is `DIVERGED`; dirty is `DIRTY`; behind-only fast-forward pulls if this
-   command pulls, else `BEHIND`; ahead-only pushes if this command pushes, else `AHEAD`.
+6. Act: both non-zero is `DIVERGED` (or a rebase under `reconcile-all`); dirty is `DIRTY`;
+   behind-only fast-forward pulls if this command pulls, else `BEHIND`; ahead-only pushes if this
+   command pushes, else `AHEAD`.
 
 A dirty repo is still fetched and still reports its behind/ahead counts — knowing you are five
 commits ahead *and* mid-edit is more useful than being told only that you are mid-edit. It is
 never pulled or pushed.
+
+## How `reconcile-all` stays safe
+
+`sync-all` stops at `DIVERGED` because untangling one is a judgement call. `reconcile-all` makes
+that call the only way it can be made safely — attempt it, and back out completely if git cannot do
+it without help:
+
+1. The repo must be **clean** first. Uncommitted changes to tracked files report `DIRTY` and the
+   rebase is never started, so there is nothing in the working tree that a rebase could lose.
+2. `git rebase @{u}` replays your local commits on top of the already-fetched upstream. No second
+   fetch, so nothing can move underneath the operation.
+3. If the rebase exits non-zero for *any* reason — a content conflict, an untracked file in the
+   way, anything — `git rebase --abort` runs immediately. That restores HEAD, the index, and the
+   working tree to their pre-rebase state. The repo reports `CONFLICT` with the conflicting paths
+   and the sweep moves on.
+4. Nothing is pushed unless every commit replayed cleanly. A push that is then rejected reports
+   `PUSH_FAILED` with the rebase already applied locally — re-running picks up from there.
+5. In the pathological case where the abort itself fails and a rebase is still in progress, the
+   repo reports `ERROR` saying so rather than pretending it was cleaned up.
+
+The tradeoff to know about: **rebasing rewrites your local commits' SHAs.** Those commits are
+unpushed by definition here, so this is normally invisible. But if someone else has pulled your
+branch, prefer to resolve it yourself. `--dry-run` reports which repos would be rebased without
+touching any of them.
 
 ### Untracked files
 

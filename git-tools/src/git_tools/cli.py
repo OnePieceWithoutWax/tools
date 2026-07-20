@@ -4,7 +4,8 @@ Naming convention
 -----------------
 * ``<git-verb>-all`` — a git operation applied once per repository found under
   a folder (``pull-all``, ``push-all``, ``fetch-all``, ``status-all``,
-  ``clean-all``, ``config-all``), plus the composite ``sync-all``.
+  ``clean-all``, ``config-all``), plus the composites ``sync-all`` and
+  ``reconcile-all``, which name an intent rather than a single git verb.
 * ``hub <verb>`` — GitHub-specific, via the `gh` CLI. The ``-all`` suffix
   carries the same meaning there, hence ``hub clone-all`` but plain
   ``hub list`` and ``hub audit``, which each run once rather than per repo.
@@ -101,12 +102,15 @@ def _sync_command(
     pull: bool,
     push: bool,
     fetch: bool = True,
+    reconcile: bool = False,
 ) -> None:
-    """Shared body of sync-all / pull-all / push-all / fetch-all / status-all."""
+    """Shared body of sync-all / pull-all / push-all / fetch-all / status-all / reconcile-all."""
     repos = _collect(folder, recursive)
     results = _in_parallel(
         repos,
-        lambda path: sync_repo(path, pull=pull, push=push, fetch=fetch, dry_run=dry_run),
+        lambda path: sync_repo(
+            path, pull=pull, push=push, fetch=fetch, reconcile=reconcile, dry_run=dry_run
+        ),
         jobs,
     )
     results.sort(key=lambda r: r.name.lower())
@@ -142,6 +146,28 @@ def sync_all(
 ) -> None:
     """Fetch, then pull repos that are behind and push repos that are ahead."""
     _sync_command(folder, recursive, dry_run, jobs, pull=True, push=True)
+
+
+@app.command("resync-all")
+def resync_all(
+    folder: FolderArg = None,
+    recursive: RecursiveOpt = False,
+    dry_run: DryRunOpt = False,
+    jobs: JobsOpt = 8,
+) -> None:
+    """Like sync-all, but also rebases diverged repos onto their upstream, then pushes.
+
+    Everything sync-all does, plus the case it refuses: a repo with both local
+    and upstream commits is rebased onto its upstream and pushed. If the rebase
+    conflicts it is aborted immediately -- HEAD and the working tree are left
+    exactly as they were -- and the repo is reported as CONFLICT for you to
+    resolve by hand. Repos with uncommitted changes are never rebased.
+
+    Note that rebasing rewrites your local commits' SHAs. That is harmless for
+    the unpushed commits this operates on, but avoid it on a branch someone
+    else has already pulled from.
+    """
+    _sync_command(folder, recursive, dry_run, jobs, pull=True, push=True, reconcile=True)
 
 
 @app.command("pull-all")

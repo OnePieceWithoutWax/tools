@@ -20,10 +20,12 @@ class Status(StrEnum):
     UP_TO_DATE = "UP_TO_DATE"
     PULLED = "PULLED"
     PUSHED = "PUSHED"
+    RECONCILED = "RECONCILED"
     BEHIND = "BEHIND"
     AHEAD = "AHEAD"
     DIRTY = "DIRTY"
     DIVERGED = "DIVERGED"
+    CONFLICT = "CONFLICT"
     NO_UPSTREAM = "NO_UPSTREAM"
     COLLISION = "COLLISION"
     PULL_FAILED = "PULL_FAILED"
@@ -87,13 +89,15 @@ def sync_repo(
     pull: bool = True,
     push: bool = True,
     fetch: bool = True,
+    reconcile: bool = False,
     dry_run: bool = False,
 ) -> RepoResult:
     """Inspect one repository and optionally pull and/or push it, never raising.
 
-    The four flags spell every command in the ``-all`` family: ``sync-all`` is
-    the default, ``pull-all`` drops ``push``, ``push-all`` drops ``pull``,
-    ``fetch-all`` drops both, and ``status-all`` drops ``fetch`` as well.
+    The flags spell every command in the ``-all`` family: ``sync-all`` is the
+    default, ``pull-all`` drops ``push``, ``push-all`` drops ``pull``,
+    ``fetch-all`` drops both, ``status-all`` drops ``fetch`` as well, and
+    ``reconcile-all`` adds ``reconcile``.
 
     Args:
         path: Repository working directory.
@@ -102,6 +106,8 @@ def sync_repo(
         fetch: Contact the remote first. With False, behind/ahead counts are
             measured against the last-fetched remote-tracking ref and may be
             stale, but nothing touches the network.
+        reconcile: Rebase a diverged repo onto its upstream instead of
+            reporting DIVERGED, aborting cleanly if the rebase conflicts.
         dry_run: Report what would happen without pulling or pushing.
 
     Returns:
@@ -109,7 +115,9 @@ def sync_repo(
     """
     name = path.name
     try:
-        return _sync(path, name, pull=pull, push=push, fetch=fetch, dry_run=dry_run)
+        return _sync(
+            path, name, pull=pull, push=push, fetch=fetch, reconcile=reconcile, dry_run=dry_run
+        )
     except Exception as exc:  # noqa: BLE001 - one repo must not stop the others
         log.error("sync failed", repo=name, error=str(exc))
         return RepoResult(path=path, name=name, branch="?", status=Status.ERROR, detail=str(exc))
@@ -122,6 +130,7 @@ def _sync(
     pull: bool,
     push: bool,
     fetch: bool,
+    reconcile: bool,
     dry_run: bool,
 ) -> RepoResult:
     branch = current_branch(path)
@@ -162,7 +171,14 @@ def _sync(
     behind, ahead = (int(n) for n in counts.stdout.split())
 
     if behind > 0 and ahead > 0:
-        return result(Status.DIVERGED, behind, ahead, "local and upstream have diverged")
+        if not reconcile:
+            return result(Status.DIVERGED, behind, ahead, "local and upstream have diverged")
+        # Rebase rewrites the working tree, so uncommitted work must be reported
+        # here rather than falling through to the shared dirty check below.
+        if dirty:
+            return result(Status.DIRTY, behind, ahead, "uncommitted changes block rebase")
+        status, detail = _do_reconcile(path, name, branch, behind, ahead, dry_run)
+        return result(status, behind, ahead, detail)
 
     # A dirty repo is reported with its counts, but never pulled or pushed.
     if dirty:
@@ -201,6 +217,67 @@ def _do_pull(path: Path, name: str, branch: str, behind: int, dry_run: bool) -> 
         return Status.PULL_FAILED, first_line(pulled.stderr)
     log.info("pulled", repo=name, branch=branch, commits=behind)
     return Status.PULLED, ""
+
+
+def _rebase_in_progress(path: Path) -> bool:
+    """Whether a rebase is still half-applied, i.e. the abort did not take.
+
+    Errs towards True: if the git dir cannot even be located, assume the repo
+    needs a human rather than reporting a clean abort that may not have happened.
+    """
+    proc = run_git(path, "rev-parse", "--git-dir")
+    if proc.returncode != 0:
+        return True
+    git_dir = Path(proc.stdout.strip())
+    if not git_dir.is_absolute():
+        git_dir = path / git_dir
+    return (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists()
+
+
+def _conflict_detail(stdout: str, stderr: str) -> str:
+    """Name the files git could not auto-merge, falling back to its error line."""
+    files = re.findall(r"Merge conflict in (.+)", stdout)
+    if not files:
+        return first_line(stderr) or "rebase could not be applied automatically"
+    shown = ", ".join(f.strip() for f in files[:3])
+    extra = f" (+{len(files) - 3} more)" if len(files) > 3 else ""
+    return f"conflicts in: {shown}{extra}"
+
+
+def _do_reconcile(
+    path: Path, name: str, branch: str, behind: int, ahead: int, dry_run: bool
+) -> tuple[Status, str]:
+    """Rebase a diverged, clean repo onto its upstream and push the result.
+
+    The rebase is the only step that can leave the repo mid-operation, so a
+    failure is followed immediately by ``git rebase --abort``, restoring HEAD
+    and the working tree to exactly where they were. Nothing is pushed unless
+    the whole rebase applied cleanly.
+
+    Returns:
+        The resulting status and its detail string.
+    """
+    if dry_run:
+        return Status.RECONCILED, f"dry-run: would rebase {ahead} onto upstream, then push"
+
+    # Upstream was fetched moments ago, so rebasing onto @{u} stays offline and
+    # cannot race a second fetch mid-operation.
+    rebased = run_git(path, "rebase", "@{u}")
+    if rebased.returncode != 0:
+        aborted = run_git(path, "rebase", "--abort")
+        if aborted.returncode != 0 and _rebase_in_progress(path):
+            log.error("rebase stuck", repo=name, error=first_line(aborted.stderr))
+            stuck = first_line(aborted.stderr)
+            return Status.ERROR, f"left mid-rebase, abort failed: {stuck}"
+        detail = _conflict_detail(rebased.stdout, rebased.stderr)
+        log.warning("rebase conflicted, aborted", repo=name, detail=detail)
+        return Status.CONFLICT, detail
+
+    log.info("rebased", repo=name, branch=branch, onto=behind, replayed=ahead)
+    status, detail = _do_push(path, name, branch, ahead, dry_run=False)
+    if status is not Status.PUSHED:
+        return status, detail
+    return Status.RECONCILED, f"rebased {ahead} onto {behind} upstream commit(s), then pushed"
 
 
 def _do_push(path: Path, name: str, branch: str, ahead: int, dry_run: bool) -> tuple[Status, str]:

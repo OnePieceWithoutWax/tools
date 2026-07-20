@@ -30,6 +30,7 @@ git-tools status-all [folder]         # offline report on every repo
 git-tools pull-all   [folder]         # fast-forward everything that's behind
 git-tools push-all   [folder]         # push everything that's ahead
 git-tools sync-all   [folder]         # both directions
+git-tools reconcile-all [folder]      # both directions + rebase diverged repos (aborts on conflict)
 git-tools clean-all  [folder]         # prune stale refs, drop merged branches
 git-tools config-all user.email [folder] --expect '*@gmail.com'
 git-tools hub list | clone-all | audit

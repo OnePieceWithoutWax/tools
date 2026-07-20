@@ -1,7 +1,7 @@
 [project]
 name = "git-tools"
-version = "3.0.0"
-description = "Git housekeeping across many repos at once: sync-all, pull-all, push-all, clean-all, plus GitHub `hub` commands"
+version = "3.1.0"
+description = "Git housekeeping across many repos at once: sync-all, reconcile-all, pull-all, push-all, clean-all, plus GitHub `hub` commands"
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2",
