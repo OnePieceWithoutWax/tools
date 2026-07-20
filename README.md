@@ -20,14 +20,16 @@ tools/
 
 ## Tools
 
-### git-sync
+### [git-sync](git-sync/README.md)
 
 Syncs all git repos under a folder: fetches, fast-forward pulls repos that are behind, pushes repos that are ahead, and skips anything dirty, diverged, or without an upstream.
 
 ```
 uv tool install ./git-sync
-git-sync <folder> [--recursive] [--dry-run] [--jobs N]
+git-sync run [folder] [--recursive] [--dry-run] [--jobs N]
 ```
+
+`folder` defaults to the current directory when omitted.
 
 ### pdf-scrub
 
