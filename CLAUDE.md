@@ -27,6 +27,10 @@ uv tool install ./<tool>             # install a tool globally
 - Each tool is self-contained: `<tool>/pyproject.toml` (with a `[project.scripts]` console-script entry point), `<tool>/src/<pkg>/`, `<tool>/tests/`.
 - Adding a tool: create the directory, add it to workspace `members`, use src layout with an entry point, add tests, and document it in a README section.
 
+## Versioning
+
+Each tool carries a semantic version in its own `pyproject.toml` (`version = "MAJOR.MINOR.PATCH"`). When you meaningfully change a tool, bump its version in the same change so `<tool> --version` stays honest: patch for fixes, minor for new backwards-compatible features, major for breaking changes. Only bump the tool(s) actually changed; skip pure test- or comment-only edits. No git tags — the `pyproject.toml` version is the source of truth.
+
 ## Conventions
 
 - Every Python tool follows the uv workspace member pattern: own directory, own `pyproject.toml` with a console-script entry point, registered in root `members`.
