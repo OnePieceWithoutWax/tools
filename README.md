@@ -52,6 +52,13 @@ Install a tool globally:
 uv tool install ./<tool>
 ```
 
+Reinstall all tools at once (e.g. after pulling changes), using `--force` so updated source is
+always picked up:
+
+```
+install_python_tools.bat
+```
+
 Run without installing:
 
 ```
