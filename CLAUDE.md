@@ -37,4 +37,5 @@ Each tool carries a semantic version in its own `pyproject.toml` (`version = "MA
 - Use src layout (`<tool>/src/<pkg>/`) with tests in `<tool>/tests/`.
 - Ruff and pytest are configured once at the workspace root; don't duplicate their config in members.
 - `windows/` is for PowerShell/batch scripts that aren't Python packages — each subfolder gets a short README explaining its scripts.
+- CLI subcommand naming (established by `git-tools`): a command that applies an operation once *per repository* gets an `-all` suffix mirroring the underlying git verb (`pull-all`, `push-all`, `clean-all`); a command that runs once does not (`hub list`, `hub audit`). Provider-specific commands live under a noun sub-app (`hub` for GitHub), where the same `-all` rule applies (`hub clone-all`). Follow this when adding commands.
 - Never commit `.venv`. `uv.lock` is committed.

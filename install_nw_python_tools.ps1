@@ -13,7 +13,7 @@
 
 .EXAMPLE
     PS> .\install_python_tools.ps1
-    Reinstalls every workspace member (currently git-sync, pdf-scrub).
+    Reinstalls every workspace member (currently git-tools, pdf-scrub).
 
 .NOTES
     Tool paths are resolved relative to this script's own location, so it

@@ -1,1 +1,1 @@
-"""Sync all git repositories under a folder: fetch, fast-forward pull, and push clean repos."""
+"""A small collection of git housekeeping commands, currently just `sync`."""

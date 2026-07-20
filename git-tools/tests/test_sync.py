@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from conftest import RepoSet, commit_file, head_of, push_remote_change, run_git
-from git_sync.repo import Status, sync_repo
-from git_sync.scanner import find_repos
+from git_tools.repo import Status, sync_repo
+from git_tools.scanner import find_repos
 
 
 def test_clean_behind_pulls(repos: RepoSet) -> None:
@@ -40,6 +40,32 @@ def test_dirty_skipped(repos: RepoSet) -> None:
     assert result.status is Status.DIRTY
     assert head_of(repos.local) == before
     assert (repos.local / "file.txt").read_text() == "uncommitted edit\n"
+
+
+def test_untracked_files_do_not_block_sync(repos: RepoSet) -> None:
+    push_remote_change(repos, "two\n")
+    (repos.local / "scratch.log").write_text("build noise\n")
+
+    result = sync_repo(repos.local)
+
+    assert result.status is Status.PULLED
+    assert (repos.local / "file.txt").read_text() == "two\n"
+    assert (repos.local / "scratch.log").read_text() == "build noise\n"
+
+
+def test_untracked_collision_aborts_pull(repos: RepoSet) -> None:
+    commit_file(repos.other, "new.txt", "from remote\n", "add new.txt")
+    run_git(repos.other, "push")
+    (repos.local / "new.txt").write_text("mine\n")
+    before = head_of(repos.local)
+
+    result = sync_repo(repos.local)
+
+    assert result.status is Status.COLLISION
+    assert "new.txt" in result.detail
+    # git aborts before touching anything, so no revert is needed.
+    assert head_of(repos.local) == before
+    assert (repos.local / "new.txt").read_text() == "mine\n"
 
 
 def test_diverged_skipped(repos: RepoSet) -> None:

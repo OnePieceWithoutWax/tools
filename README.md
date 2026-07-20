@@ -20,16 +20,24 @@ tools/
 
 ## Tools
 
-### [git-sync](git-sync/README.md)
+### [git-tools](git-tools/README.md)
 
-Syncs all git repos under a folder: fetches, fast-forward pulls repos that are behind, pushes repos that are ahead, and skips anything dirty, diverged, or without an upstream.
+Git housekeeping across many repos at once. Commands ending in `-all` apply a git operation to every repo under a folder — skipping anything dirty, diverged, or without an upstream — and `hub` commands do the same against GitHub via the `gh` CLI.
 
 ```
-uv tool install ./git-sync
-git-sync run [folder] [--recursive] [--dry-run] [--jobs N]
+uv tool install ./git-tools
+git-tools status-all [folder]         # offline report on every repo
+git-tools pull-all   [folder]         # fast-forward everything that's behind
+git-tools push-all   [folder]         # push everything that's ahead
+git-tools sync-all   [folder]         # both directions
+git-tools clean-all  [folder]         # prune stale refs, drop merged branches
+git-tools config-all user.email [folder] --expect '*@gmail.com'
+git-tools hub list | clone-all | audit
 ```
 
-`folder` defaults to the current directory when omitted.
+`folder` defaults to the current directory when omitted. Every `-all` command takes `--recursive`, `--jobs N`, and (where it changes something) `--dry-run`.
+
+Naming convention: the `-all` suffix means the operation repeats once per repository, which is why `hub clone-all` has it but `hub list` and `hub audit` — single queries — do not. The `hub` commands need [`gh`](https://cli.github.com) installed and authenticated.
 
 ### pdf-scrub
 
