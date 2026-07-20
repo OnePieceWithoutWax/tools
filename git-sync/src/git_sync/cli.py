@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Annotated
 
@@ -15,8 +16,24 @@ from git_sync.scanner import find_repos
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(_pkg_version("git-sync"))
+        raise typer.Exit(0)
+
+
 @app.callback()
-def callback() -> None:
+def callback(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show the git-sync version and exit.",
+        ),
+    ] = False,
+) -> None:
     """Sync git repositories under a folder: fetch, fast-forward pull, and push clean repos."""
 
 
