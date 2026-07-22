@@ -40,6 +40,21 @@ git-tools hub list | clone-all | audit
 
 Naming convention: the `-all` suffix means the operation repeats once per repository, which is why `hub clone-all` has it but `hub list` and `hub audit` — single queries — do not. The `hub` commands need [`gh`](https://cli.github.com) installed and authenticated.
 
+### [fdt](fdt/README.md)
+
+File and directory housekeeping, grouped by what a command acts on: `fdt folder <verb>` for directories, `fdt file <verb>` for files.
+
+```
+uv tool install ./fdt
+fdt folder clean-empty   [path] [-r]    # delete empty folders, bottom-up with -r
+fdt folder clean-jupyter [path] [-r]    # delete .ipynb_checkpoints folders, contents and all
+fdt folder size          [path]         # where the space went, largest first
+fdt file find-large      [path]         # biggest files
+fdt file find-dupes      [path]         # byte-identical files (reports only)
+```
+
+`path` defaults to the current directory. Everything that deletes takes `--dry-run`, and `.git`/`.venv`/`node_modules`/`__pycache__` and friends are skipped unless you pass `--no-default-skips`.
+
 ### pdf-scrub
 
 Strips mailto link annotations and watermarks (annotation- and layer-based) from PDFs.
